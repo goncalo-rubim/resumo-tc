@@ -56,7 +56,7 @@
             margin: 0; 
             font-size: clamp(36px, 5vw, 48px); 
             letter-spacing: -1.5px; 
-            line-height: 1.3; /* FORÇADO A 1.3 */
+            line-height: 1.3;
             background: linear-gradient(to bottom right, #fff, #94a3b8); 
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
@@ -88,7 +88,7 @@
         }
         .tab-btn.active { background: rgba(34, 197, 94, 0.1); color: #fff; border-color: var(--accent); }
 
-        /* TEXTAREA (Improved) */
+        /* TEXTAREA */
         textarea {
             width: 100%; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border);
             color: var(--text-main); border-radius: 12px; padding: 16px; font-size: 14px;
@@ -136,12 +136,11 @@
         .output-scroll h2 { color: #fff; margin-top: 24px; font-size: 17px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 6px; }
         .output-scroll strong { color: var(--accent); }
         
-        /* AVISO NO OUTPUT (O QUE PEDISTE) */
-        /* O Backend envia isto como '>', o CSS transforma-o num bloco destacado */
+        /* AVISO NO OUTPUT */
         .output-scroll blockquote {
-            background: rgba(234, 179, 8, 0.1); /* Fundo Amarelo Transparente */
-            border-left: 4px solid #eab308; /* Barra Lateral Amarela */
-            color: #fef08a; /* Texto Amarelo Claro */
+            background: rgba(234, 179, 8, 0.1);
+            border-left: 4px solid #eab308;
+            color: #fef08a;
             margin: 0 0 20px 0;
             padding: 16px;
             border-radius: 0 8px 8px 0;
@@ -235,7 +234,6 @@
         </section>
     </main>
 
-    <!-- FOOTER SIMPLES -->
     <footer class="simple-footer">
         Isenção de Responsabilidade: Esta ferramenta utiliza Inteligência Artificial para processar informação.
         Embora o objetivo seja a precisão, podem ocorrer erros. O conteúdo é apenas informativo e 
@@ -246,6 +244,8 @@
         lucide.createIcons();
         let currentFile = null;
         let mode = 'text';
+        // Variável para guardar os timers e poder cancelá-los
+        let statusTimeouts = [];
 
         // Tab Switching
         function setMode(newMode) {
@@ -309,6 +309,12 @@
             type();
         };
 
+        // Função para Limpar Timers Antigos
+        function clearStatusTimeouts() {
+            statusTimeouts.forEach(timer => clearTimeout(timer));
+            statusTimeouts = [];
+        }
+
         // Update Status
         function updateStatus(msg) {
             document.getElementById('output').innerHTML = `
@@ -328,6 +334,9 @@
             if (mode === 'text' && textVal.length < 5) return alert("Insere texto.");
             if (mode === 'pdf' && !currentFile) return alert("Escolhe um ficheiro.");
 
+            // 1. Limpar timers antigos para evitar conflitos
+            clearStatusTimeouts();
+
             btn.disabled = true;
             updateStatus("A iniciar...");
 
@@ -342,9 +351,10 @@
                     formData.append('terms_text', textVal);
                 }
 
-                // Feedback visual de progresso
-                setTimeout(() => updateStatus("A analisar riscos e cláusulas..."), 1500);
-                setTimeout(() => updateStatus("A formatar o relatório..."), 3500);
+                // 2. Agendar atualizações de status (guardando os IDs para poder cancelar)
+                statusTimeouts.push(setTimeout(() => updateStatus("A analisar riscos e cláusulas..."), 1500));
+                statusTimeouts.push(setTimeout(() => updateStatus("A formatar o relatório..."), 3500));
+                statusTimeouts.push(setTimeout(() => updateStatus("Quase pronto..."), 8000));
 
                 const res = await fetch('/api/summarize', { method: 'POST', body: formData });
                 const data = await res.json();
@@ -356,6 +366,10 @@
             } catch (err) {
                 document.getElementById('output').innerHTML = `<div style="color:#ef4444; text-align:center; padding-top:50px;">Erro: ${err.message}</div>`;
             } finally {
+                // 3. CANCELAR TODOS OS TIMERS PENDENTES
+                // Se a resposta chegar em 0.5s, os timers de 1.5s e 3.5s são cancelados aqui.
+                clearStatusTimeouts();
+                
                 btn.disabled = false;
                 btn.innerHTML = '<span>Analisar Documento</span> <i data-lucide="arrow-right" width="16"></i>';
                 lucide.createIcons();
@@ -369,7 +383,6 @@
 
             navigator.clipboard.writeText(text).then(() => {
                 const btn = document.getElementById('btnCopy');
-                const label = document.getElementById('copyLabel');
                 
                 btn.classList.add('success');
                 btn.innerHTML = `<i data-lucide="check" width="14"></i> Copiado!`;
